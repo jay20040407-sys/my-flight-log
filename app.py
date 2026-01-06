@@ -7,83 +7,69 @@ from datetime import datetime
 st.set_page_config(page_title="我的飛行日誌", page_icon="✈️")
 st.title("✈️ 我的個人飛行日誌")
 
-# --- 後端設定 ---
-AVI_KEY = "a85e1d8cc607a691b63846eea47bd40e"
+# --- 設定區 ---
+# 這是你剛才抓到的 Key
+RAPID_API_KEY = "d2cfcfb899msh0ee2823290701c7p126029jsn9f6dab4a88df"
 
-# --- 側邊欄輸入 ---
 with st.sidebar:
-    st.header("1. 航班基本資訊")
-    flight_no = st.text_input("航班號碼", value="HB704")
+    st.header("🔍 航班查詢")
+    flight_no = st.text_input("航班號碼 (如: HB704)", value="HB704").upper()
     target_date = st.date_input("飛行日期", value=datetime.now())
-    
-    st.header("2. 手動校正 (若 API 沒抓到請填寫)")
-    manual_reg = st.text_input("手動填寫飛機編號 (如: B-18918)", value="")
-    manual_type = st.text_input("手動填寫機型 (如: A359)", value="")
-    
-    st.info("提示：如果查詢結果顯示『未提供』，請在上方手動輸入後重新查詢。")
+    st.info("AeroDataBox 會提供精準的機身註冊編號。")
 
-def parse_time(t_str):
-    if not t_str: return None
-    try:
-        return datetime.fromisoformat(t_str.replace('Z', '+00:00'))
-    except:
-        return None
+if st.button("從高級資料庫抓取數據"):
+    # AeroDataBox 查詢網址
+    url = f"https://aerodatabox.p.rapidapi.com/flights/number/{flight_no}/{target_date}"
+    
+    headers = {
+        "x-rapidapi-key": RAPID_API_KEY,
+        "x-rapidapi-host": "aerodatabox.p.rapidapi.com"
+    }
+    
+    with st.spinner('正在檢索機身詳細資訊...'):
+        response = requests.get(url, headers=headers)
+        
+    if response.status_code == 200:
+        data = response.json()
+        
+        if len(data) > 0:
+            # 取得第一筆資料
+            f = data[0]
+            aircraft = f.get('aircraft', {})
+            
+            # 格式化時間：AeroDataBox 回傳的是 Zulu Time (UTC)
+            def format_zulu(t_str):
+                if not t_str: return "N/A"
+                # 轉成 HH:MMZ 格式
+                return t_str.split('T')[1][:5] + "Z"
 
-if st.button("查詢並記錄"):
-    url = f"http://api.aviationstack.com/v1/flights?access_key={AVI_KEY}&flight_iata={flight_no}"
-    
-    with st.spinner('正在從雲端抓取數據...'):
-        try:
-            response = requests.get(url)
-            data = response.json()
-        except:
-            st.error("連線 API 失敗")
-            st.stop()
-    
-    if data.get('data') and len(data['data']) > 0:
-        # 尋找指定日期的航班
-        f = next((i for i in data['data'] if i['flight_date'] == str(target_date)), data['data'][0])
-        
-        # 時間解析與計算
-        dep_dt = parse_time(f['departure']['actual'] or f['departure']['scheduled'])
-        arr_dt = parse_time(f['arrival']['actual'] or f['arrival']['scheduled'])
-        
-        duration = "未知"
-        if dep_dt and arr_dt:
-            diff = arr_dt - dep_dt
-            total_seconds = int(diff.total_seconds())
-            if total_seconds > 0:
-                h, m = divmod(total_seconds, 3600)
-                duration = f"{h}h {m//60}m"
-        
-        # 優先使用手動輸入的資料，若無則使用 API 資料
-        final_reg = manual_reg if manual_reg else (f['aircraft'].get('registration') or "未提供")
-        final_type = manual_type if manual_type else (f['aircraft'].get('icao') or f['aircraft'].get('model') or "未提供")
-        
-        # 整理結果資料
-        res = {
-            "航班/日期": f"{flight_no} / {target_date}",
-            "飛機編號": final_reg,
-            "機型": final_type,
-            "實際起降(Zulu)": f"{dep_dt.strftime('%H:%M') if dep_dt else 'N/A'}Z / {arr_dt.strftime('%H:%M') if arr_dt else 'N/A'}Z",
-            "飛行時間": duration,
-            "狀態": f.get('flight_status', '未知').upper(),
-            "登機門": f"{f['departure'].get('gate') or 'N/A'}"
-        }
-        
-        st.success("查詢成功！")
-        st.table(pd.DataFrame([res]))
-        
-        # 下載 CSV 功能
-        csv = pd.DataFrame([res]).to_csv(index=False).encode('utf-8-sig')
-        st.download_button(
-            label="下載此筆紀錄 CSV",
-            data=csv,
-            file_name=f"{flight_no}_{target_date}_log.csv",
-            mime="text/csv"
-        )
+            dep_z = format_zulu(f['departure'].get('actualTimeUtc') or f['departure'].get('scheduledTimeUtc'))
+            arr_z = format_zulu(f['arrival'].get('actualTimeUtc') or f['arrival'].get('scheduledTimeUtc'))
+
+            res = {
+                "航班/日期": f"{flight_no} / {target_date}",
+                "飛機編號 (Reg)": aircraft.get('reg', '⚠️ 無法取得'),
+                "機型 (Model)": aircraft.get('model', '⚠️ 無法取得'),
+                "起降(Zulu)": f"{dep_z} / {arr_z}",
+                "狀態": f.get('status', 'Unknown').upper(),
+                "航空公司": f['airline'].get('name', 'N/A')
+            }
+            
+            st.success("數據抓取成功！")
+            st.table(pd.DataFrame([res]))
+            
+            # 下載 CSV 功能
+            csv = pd.DataFrame([res]).to_csv(index=False).encode('utf-8-sig')
+            st.download_button("💾 下載此筆日誌紀錄", data=csv, file_name=f"Log_{flight_no}_{target_date}.csv")
+            
+            if aircraft.get('reg') == None:
+                st.warning("提示：該航班尚未分配機身編號，請於起飛後再試。")
+        else:
+            st.warning("資料庫中找不到該航班，請確認號碼與日期。")
+    elif response.status_code == 404:
+        st.error("找不到資料：請確認日期是否在最近幾天內（免費版查詢範圍有限）。")
     else:
-        st.error("找不到該航班資料。")
+        st.error(f"連線失敗 (代碼: {response.status_code})，請確認 API Key 是否有效。")
 
 st.divider()
-st.caption("數據來源：Aviationstack API | 飛行紀錄自動化工具")
+st.caption("Data Source: AeroDataBox via RapidAPI")
