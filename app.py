@@ -17,8 +17,8 @@ with st.sidebar:
     target_date = st.date_input("飛行日期", value=datetime.now())
     
     st.header("2. 手動校正 (若 API 沒抓到請填寫)")
-    manual_reg = st.text_input("手動填寫飛機編號 (如: B-KJE)", value="")
-    manual_type = st.text_input("手動填寫機型 (如: Boeing 737-800)", value="")
+    manual_reg = st.text_input("手動填寫飛機編號 (如: B-18918)", value="")
+    manual_type = st.text_input("手動填寫機型 (如: A359)", value="")
     
     st.info("提示：如果查詢結果顯示『未提供』，請在上方手動輸入後重新查詢。")
 
