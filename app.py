@@ -68,6 +68,22 @@ if st.button("全自動深度查詢"):
                 duration = f"{h}h {m//60}m"
             except: pass
 
+        # --- 航空公司智慧識別邏輯 ---
+        # 建立常用代碼映射表
+        airline_map = {
+            "BR": "長榮航空 (EVA Air)",
+            "CI": "中華航空 (China Airlines)",
+            "HB": "大灣區航空 (Greater Bay Airlines)",
+            "JX": "星宇航空 (Starlux Airlines)",
+            "CX": "國泰航空 (Cathay Pacific)",
+            "JL": "日本航空 (Japan Airlines)",
+            "NH": "全日空 (ANA)"
+        }
+        
+        # 優先權：1. 映射表 > 2. API 回傳名稱 > 3. 根據前綴自動推斷
+        prefix = flight_no[:2]
+        airline = airline_map.get(prefix) or f.get('operator_name') or f"未知航司 ({prefix})"
+
         res = {
             "航班/日期": f"{flight_no} / {target_date}",
             "航段 (Route)": route,
@@ -75,7 +91,7 @@ if st.button("全自動深度查詢"):
             "機型 (Model)": model,
             "起降(Zulu)": f"{format_z(dep_z)} / {format_z(arr_z)}",
             "飛行時間": duration,
-            "航空公司": f.get('operator_name', '大灣區航空' if 'HB' in flight_no else '未知')
+            "航空公司": airline  # 現在這裡會顯示『長榮航空』了
         }
 
         st.success("雷達數據自動對應成功！")
