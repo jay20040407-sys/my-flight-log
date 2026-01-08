@@ -36,7 +36,7 @@ if st.button("啟動全自動檢索"):
         
     if f:
         # 1. 航空公司自動識別
-        airline_map = {"BR": "長榮航空", "CI": "中華航空", "HB": "大灣區航空", "JX": "星宇航空", "CX": "國泰航空", "AE": "華信航空"}
+        airline_map = {"BR": "長榮航空", "CI": "中華航空", "HB": "大灣區航空", "JX": "星宇航空", "CX": "國泰航空", "AE": "華信航空", "IT": "台灣虎航"}
         prefix = flight_no[:2]
         airline = airline_map.get(prefix) or f.get('operator_name') or "未知航司"
 
